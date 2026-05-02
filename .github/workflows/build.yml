@@ -15,8 +15,8 @@ jobs:
           pip install --upgrade pip
           pip install flet
       - name: Build APK
-        run: |
-          flet build apk --project "Ballistic Pro" --no-prompt
+        # Додано --no-prompt, щоб обійти помилку вводу
+        run: flet build apk --no-prompt
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
