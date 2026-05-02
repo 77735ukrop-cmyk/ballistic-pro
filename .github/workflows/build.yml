@@ -1,5 +1,4 @@
-- name: Build APK
-run: flet build apk --module-name ballistic.py
+name: Build APK
 
 on: [push]
 
@@ -8,26 +7,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
-      - name: Install Flet
-        run: pip install flet
-
-      # Цей крок автоматично налаштує Flutter, щоб Flet нічого не питав
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install flet
       - name: Build APK
-        # Тепер без --no-prompt, бо Flutter вже налаштований
-        run: flet build apk
-        
+        run: flet build apk --module-name ballistic.py
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/apk/app-release-aarch64.apk
         with:
           name: app-release
           path: build/apk/app-release-aarch64.apk
