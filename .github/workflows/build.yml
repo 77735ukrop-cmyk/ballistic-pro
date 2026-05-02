@@ -1,5 +1,5 @@
-name: Build APK
-
+- name: Build APK
+        run: flet build apk --project "Ballistic Pro" --no-prompt
 on: [push]
 
 jobs:
