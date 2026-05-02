@@ -1,4 +1,6 @@
-name: Build APK
+- name: Build APK
+        # Додаємо --module-name, щоб вказати на ваш файл
+        run: flet build apk --module-name ballistic.py
 
 on: [push]
 
