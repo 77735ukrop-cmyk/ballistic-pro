@@ -1,5 +1,5 @@
 - name: Build APK
-        run: flet build apk --module-name ballistic.py
+run: flet build apk --module-name ballistic.py
 
 on: [push]
 
