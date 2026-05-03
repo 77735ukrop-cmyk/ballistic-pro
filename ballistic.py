@@ -16,9 +16,47 @@ arsenal = {
 cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "Ballistic Pro"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.scroll = "always"
+    page.title = "BALLISTIC PRO"
+    page.scroll = ft.ScrollMode.ADAPTIVE # Це важливо: дозволяє гортати, якщо не влізе
+    page.padding = 20 # Відступи по краях екрана
+    
+    # Створюємо вертикальний список елементів
+    layout = ft.Column(
+        controls=[
+            ft.Text("BALLISTIC PRO v2.0", size=24, weight="bold"),
+            
+            # Поля вводу йдуть одне за одним
+            ft.TextField(label="Висота (м)", keyboard_type=ft.KeyboardType.NUMBER),
+            ft.TextField(label="V БПЛА (м/с)", keyboard_type=ft.KeyboardType.NUMBER),
+            
+            # Випадаючий список
+            ft.Dropdown(
+                label="Оберіть Арсенал (БК)",
+                options=[
+                    ft.dropdown.Option("MOA-400"),
+                    ft.dropdown.Option("Інший варіант"),
+                ],
+            ),
+            
+            # Поля Маси та Cx можна зробити в ряд, якщо вони короткі
+            ft.Row([
+                ft.TextField(label="Маса (кг)", expand=True),
+                ft.TextField(label="Cx", expand=True),
+            ]),
+            
+            ft.TextField(label="Локація"),
+            
+            # Кнопка
+            ft.ElevatedButton(text="РОЗРАХУВАТИ", on_click=lambda _: print("Рахуємо...")),
+            
+            # Результати
+            ft.Text("ДИСТАНЦІЯ СКИДУ:", weight="bold"),
+            ft.Text("489.68 м", color="red", size=30),
+        ],
+        spacing=15, # Відстань між елементами (по 15 пікселів)
+    )
+
+    page.add(layout)
 
     # Поля введення
     ent_h = ft.TextField(label="Висота (м)", value="1000")
