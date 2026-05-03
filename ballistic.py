@@ -89,11 +89,11 @@ def main(page: ft.Page):
 
     res_l = ft.Text("0.0 м", size=35, weight="bold", color="red")
     res_angle = ft.Text("0.0°", size=25, color="blue")
+    res_time = ft.Text("0.0 с", size=25, color="green") # Новий індикатор часу
     lbl_status = ft.Text("", color="yellow")
 
     # Логіка погоди
     def get_weather(e):
-        # ... (ваш код погоди залишається без змін) ...
         city = city_dropdown.value
         api_key = "26419f7c6a93b4f4e515dcfcda96586b"
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
@@ -128,8 +128,11 @@ def main(page: ft.Page):
             dist_l = (2*m/(rho*cx*s)) * math.log(1 + (rho*cx*s*(v+w)*t_fall)/(2*m))
             angle_deg = math.degrees(math.atan(h / dist_l)) if dist_l > 0 else 90
             
+            # Вивід результатів
             res_l.value = f"{round(dist_l, 2)} м"
             res_angle.value = f"{round(angle_deg, 2)}°"
+            res_time.value = f"{round(t_fall, 2)} с" # Відображення часу
+            
             lbl_status.value = "Розраховано"
             page.update()
         except Exception as ex:
@@ -145,7 +148,7 @@ def main(page: ft.Page):
             ammo_dropdown,
             ft.Row([ent_m, ent_cx, ent_s], wrap=True),
             
-            # Меню додавання БК
+            # Меню додавання/редагування БК
             ft.ExpansionTile(
                 title=ft.Text("Керування Арсеналом (+ / Редагувати)"),
                 controls=[
@@ -160,8 +163,11 @@ def main(page: ft.Page):
             ft.Row([ent_temp, ent_press], wrap=True),
             ft.Divider(),
             ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=60, width=400),
+            
+            # Результати
             ft.Text("ДИСТАНЦІЯ СКИДУ:"), res_l,
             ft.Text("КУТ НАХИЛУ:"), res_angle,
+            ft.Text("ЧАС ПОЛЬОТУ:"), res_time, 
             lbl_status
         ], spacing=10)
     )
