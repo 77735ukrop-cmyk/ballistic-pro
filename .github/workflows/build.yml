@@ -23,11 +23,12 @@ jobs:
         run: pip install flet
 
       - name: Build APK
-        # Ми кажемо Flet використовувати саме твій файл
+        # Вказуємо назву вашого головного файлу
         run: flet build apk --module-name ballistic.py
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: build/apk/app-release-aarch64.apk
+          # Використовуємо зірочку, щоб знайти APK з будь-якою назвою в цій папці
+          path: build/apk/*.apk
