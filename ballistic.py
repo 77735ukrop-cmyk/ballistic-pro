@@ -1,175 +1,169 @@
 import flet as ft
 import math
+import requests
+import json
+import os
+
+# --- ФАЙЛОВА СИСТЕМА ---
+DATA_FILE = "arsenal_data.json"
+
+DEFAULT_ARSENAL = {
+    "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
+    "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528}
+}
+
+def load_arsenal():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return DEFAULT_ARSENAL
+    return DEFAULT_ARSENAL
+
+def save_arsenal(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+arsenal = load_arsenal()
+cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    # Головний обробник помилок, щоб не було чорного екрана
-    try:
-        page.title = "BALLISTIC PRO"
-        page.theme_mode = ft.ThemeMode.DARK
-        page.padding = 10
-        page.scroll = ft.ScrollMode.ADAPTIVE
+    page.title = "BALLISTIC PRO"
+    page.scroll = ft.ScrollMode.ADAPTIVE
+    page.padding = 20
 
-        # --- БАЗОВІ ДАНІ ---
-        DEFAULT_ARSENAL = {
-            "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
-            "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528},
-            "БЦ-2500": {"m": 3.0, "cx": 0.42, "s": 0.00636}
-        }
+    # Поля введення
+    ent_h = ft.TextField(label="Висота (м)", value="1000", keyboard_type=ft.KeyboardType.NUMBER)
+    ent_v = ft.TextField(label="V БПЛА (м/с)", value="5", keyboard_type=ft.KeyboardType.NUMBER)
+    ent_w = ft.TextField(label="V вітру (м/с)", value="0", keyboard_type=ft.KeyboardType.NUMBER)
+    
+    ent_m = ft.TextField(label="Маса (кг)", value="0")
+    ent_cx = ft.TextField(label="Cx", value="0")
+    ent_s = ft.TextField(label="S (площа)", value="0")
+    
+    ent_temp = ft.TextField(label="Температура (°C)", value="15")
+    ent_press = ft.TextField(label="Тиск (гПа)", value="1013")
 
-        # --- ЕЛЕМЕНТИ ІНТЕРФЕЙСУ ---
-        ent_h = ft.TextField(label="H (м)", value="1000", expand=1, keyboard_type=ft.KeyboardType.NUMBER)
-        ent_v = ft.TextField(label="V (м/с)", value="5", expand=1, keyboard_type=ft.KeyboardType.NUMBER)
-        ent_w = ft.TextField(label="W (вітер)", value="0", expand=1, keyboard_type=ft.KeyboardType.NUMBER)
+    # Поля для додавання/редагування БК
+    new_name = ft.TextField(label="Назва (або змінити існуючу)")
+    new_m = ft.TextField(label="Маса (кг)")
+    new_cx = ft.TextField(label="Cx")
+    new_s = ft.TextField(label="S (площа)")
 
-        ent_m = ft.TextField(label="m (кг)", value="0", expand=1)
-        ent_cx = ft.TextField(label="Cx", value="0", expand=1)
-        ent_s = ft.TextField(label="S (м²)", value="0", expand=1)
+    # Функція оновлення випадаючого списку
+    def refresh_dropdown():
+        ammo_dropdown.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
+        page.update()
 
-        ammo_dd = ft.Dropdown(label="Боєприпас", expand=True)
-        city_dd = ft.Dropdown(
-            label="Місто",
-            options=[ft.dropdown.Option(c) for c in ["Kramatorsk,UA", "Toretsk,UA", "Donetsk,UA", "Horlivka,UA"]],
-            value="Kramatorsk,UA",
-            expand=True
-        )
-
-        ent_temp = ft.TextField(label="T (°C)", value="15", expand=1)
-        ent_press = ft.TextField(label="P (гПа)", value="1013", expand=1)
-        lbl_rho = ft.Text("ρ (густина): ---", size=14, color="orange")
-
-        res_angle = ft.Text("0.0°", size=22, weight="bold", color="blue")
-        res_time = ft.Text("0.0 с", size=22, weight="bold", color="green")
-        res_dist = ft.Text("0.0 м", size=22, weight="bold", color="red")
-        lbl_status = ft.Text("Система готова", size=12, color="white60")
-
-        # --- ЛОГІКА ---
-        def get_arsenal():
-            data = page.client_storage.get("arsenal_data")
-            return data if data else DEFAULT_ARSENAL
-
-        def update_fields(e=None):
-            arsenal = get_arsenal()
-            if ammo_dd.value in arsenal:
-                d = arsenal[ammo_dd.value]
-                ent_m.value = str(d["m"])
-                ent_cx.value = str(d["cx"])
-                ent_s.value = str(d["s"])
+    # Функція збереження БК
+    def save_bk(e):
+        name = new_name.value
+        if name:
+            arsenal[name] = {"m": float(new_m.value), "cx": float(new_cx.value), "s": float(new_s.value)}
+            save_arsenal(arsenal)
+            refresh_dropdown()
+            lbl_status.value = f"БК '{name}' збережено!"
             page.update()
 
-        def calculate(e):
-            try:
-                m, cx, s = float(ent_m.value), float(ent_cx.value), float(ent_s.value)
-                h, v, w = float(ent_h.value), float(ent_v.value), float(ent_w.value)
-                t, p = float(ent_temp.value), float(ent_press.value)
+    # Функція вибору БК (заповнює поля автоматично)
+    def on_ammo_change(e):
+        data = arsenal[ammo_dropdown.value]
+        ent_m.value = str(data['m'])
+        ent_cx.value = str(data['cx'])
+        ent_s.value = str(data['s'])
+        page.update()
 
-                rho = (p * 100) / (287.05 * (t + 273.15))
-                lbl_rho.value = f"ρ (густина): {round(rho, 4)}"
-                
-                g = 9.81
-                k = (rho * cx * s) / 2
-                
-                t_fall = math.sqrt(m/(k*g)) * math.acosh(math.exp(k*h/m))
-                dist = (m/k) * math.log(1 + (k*(v+w)*t_fall)/m)
-                angle = math.degrees(math.atan(h / dist)) if dist > 0 else 90
+    ammo_dropdown = ft.Dropdown(
+        label="Оберіть Арсенал (БК)",
+        options=[ft.dropdown.Option(k) for k in arsenal.keys()],
+        value="ОГБ-1",
+        on_change=on_ammo_change
+    )
+    
+    city_dropdown = ft.Dropdown(
+        label="Локація",
+        options=[ft.dropdown.Option(c) for c in cities],
+        value=cities[0]
+    )
 
-                res_dist.value = f"{round(dist, 1)} м"
-                res_angle.value = f"{round(angle, 1)}°"
-                res_time.value = f"{round(t_fall, 2)} с"
-                lbl_status.value = "Розраховано успішно"
-                lbl_status.color = "green"
-            except:
-                lbl_status.value = "Помилка в числах"
-                lbl_status.color = "red"
-            page.update()
+    res_l = ft.Text("0.0 м", size=35, weight="bold", color="red")
+    res_angle = ft.Text("0.0°", size=25, color="blue")
+    lbl_status = ft.Text("", color="yellow")
 
-        def get_weather(e):
-            import requests # Імпорт всередині
-            try:
-                url = f"http://api.openweathermap.org/data/2.5/weather?q={city_dd.value}&appid=26419f7c6a93b4f4e515dcfcda96586b&units=metric"
-                r = requests.get(url, timeout=5).json()
-                ent_temp.value = str(r["main"]["temp"])
-                ent_press.value = str(r["main"]["pressure"])
+    # Логіка погоди
+    def get_weather(e):
+        # ... (ваш код погоди залишається без змін) ...
+        city = city_dropdown.value
+        api_key = "26419f7c6a93b4f4e515dcfcda96586b"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+        try:
+            r = requests.get(url, timeout=5).json()
+            if r.get("cod") == 200:
+                ent_temp.value = str(r['main']['temp'])
+                ent_press.value = str(r['main']['pressure'])
                 lbl_status.value = "Погода оновлена"
-                calculate(None)
-            except:
-                lbl_status.value = "Помилка погоди (перевірте інтернет)"
+            else:
+                lbl_status.value = "Помилка погоди"
+        except:
+            lbl_status.value = "Немає зв'язку"
+        page.update()
+
+    # Логіка розрахунку
+    def calculate(e):
+        try:
+            m = float(ent_m.value)
+            cx = float(ent_cx.value)
+            s = float(ent_s.value)
+            h = float(ent_h.value)
+            v = float(ent_v.value)
+            w = float(ent_w.value)
+            t = float(ent_temp.value)
+            p = float(ent_press.value)
+
+            rho = (p * 100) / (287.05 * (t + 273.15))
+            g = 9.81
+            
+            t_fall = math.sqrt(2*m/(rho*cx*s*g)) * math.acosh(math.exp(rho*cx*s*h/(2*m)))
+            dist_l = (2*m/(rho*cx*s)) * math.log(1 + (rho*cx*s*(v+w)*t_fall)/(2*m))
+            angle_deg = math.degrees(math.atan(h / dist_l)) if dist_l > 0 else 90
+            
+            res_l.value = f"{round(dist_l, 2)} м"
+            res_angle.value = f"{round(angle_deg, 2)}°"
+            lbl_status.value = "Розраховано"
+            page.update()
+        except Exception as ex:
+            lbl_status.value = f"Помилка: {ex}"
             page.update()
 
-        # --- ДІАЛОГ НАЛАШТУВАНЬ ---
-        edit_name = ft.TextField(label="Назва")
-        edit_m = ft.TextField(label="Маса")
-        edit_cx = ft.TextField(label="Cx")
-        edit_s = ft.TextField(label="S")
-
-        def save_bk(e):
-            if edit_name.value:
-                current_arsenal = get_arsenal()
-                current_arsenal[edit_name.value] = {
-                    "m": float(edit_m.value or 0),
-                    "cx": float(edit_cx.value or 0),
-                    "s": float(edit_s.value or 0)
-                }
-                page.client_storage.set("arsenal_data", current_arsenal)
-                refresh_dd()
-                dlg.open = False
-                page.update()
-
-        dlg = ft.AlertDialog(
-            title=ft.Text("Редагувати БК"),
-            content=ft.Column([edit_name, edit_m, edit_cx, edit_s], tight=True),
-            actions=[ft.TextButton("Зберегти", on_click=save_bk)]
-        )
-
-        def open_settings(e):
-            arsenal = get_arsenal()
-            if ammo_dd.value in arsenal:
-                d = arsenal[ammo_dd.value]
-                edit_name.value = ammo_dd.value
-                edit_m.value = str(d["m"])
-                edit_cx.value = str(d["cx"])
-                edit_s.value = str(d["s"])
-            page.dialog = dlg
-            dlg.open = True
-            page.update()
-
-        def refresh_dd():
-            arsenal = get_arsenal()
-            ammo_dd.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
-            if not ammo_dd.value: ammo_dd.value = list(arsenal.keys())[0]
-
-        # --- ЗБІРКА ІНТЕРФЕЙСУ ---
-        page.add(
-            ft.Text("BALLISTIC PRO v2.1", size=22, weight="bold"),
-            ft.Row([ent_h, ent_v, ent_w]),
-            ft.Divider(height=5),
-            ft.Row([ammo_dd, ft.IconButton(ft.icons.SETTINGS, on_click=open_settings)]),
-            ft.Row([ent_m, ent_cx, ent_s]),
-            ft.Divider(height=5),
-            city_dd,
-            ft.Row([ent_temp, ent_press]),
-            ft.ElevatedButton("ОНОВИТИ МЕТЕО", icon=ft.icons.CLOUD, on_click=get_weather, width=400),
-            lbl_rho,
-            ft.Divider(height=10),
-            ft.ElevatedButton("РОЗРАХУВАТИ", bgcolor="green", color="white", height=60, width=400, on_click=calculate),
-            ft.Container(
-                padding=10,
-                border=ft.border.all(1, "white24"),
-                border_radius=10,
-                content=ft.Row([
-                    ft.Column([ft.Text("КУТ", size=10), res_angle], expand=1, horizontal_alignment="center"),
-                    ft.Column([ft.Text("ЧАС", size=10), res_time], expand=1, horizontal_alignment="center"),
-                    ft.Column([ft.Text("ВІДСТАНЬ", size=10), res_dist], expand=1, horizontal_alignment="center"),
-                ])
+    # Інтерфейс
+    page.add(
+        ft.Column([
+            ft.Text("BALLISTIC PRO v2.0", size=24, weight="bold"),
+            ent_h, ent_v, ent_w,
+            ft.Divider(),
+            ammo_dropdown,
+            ft.Row([ent_m, ent_cx, ent_s], wrap=True),
+            
+            # Меню додавання БК
+            ft.ExpansionTile(
+                title=ft.Text("Керування Арсеналом (+ / Редагувати)"),
+                controls=[
+                    new_name, new_m, new_cx, new_s,
+                    ft.ElevatedButton("ЗБЕРЕГТИ / ДОДАТИ БК", on_click=save_bk)
+                ]
             ),
+            
+            ft.Divider(),
+            city_dropdown,
+            ft.ElevatedButton("ОНОВИТИ ПОГОДУ", on_click=get_weather),
+            ft.Row([ent_temp, ent_press], wrap=True),
+            ft.Divider(),
+            ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=60, width=400),
+            ft.Text("ДИСТАНЦІЯ СКИДУ:"), res_l,
+            ft.Text("КУТ НАХИЛУ:"), res_angle,
             lbl_status
-        )
-
-        # Фінальна ініціалізація після page.add()
-        refresh_dd()
-        update_fields()
-
-    except Exception as e:
-        # Це врятує від чорного екрана, показавши помилку
-        page.add(ft.Text(f"Критична помилка: {e}", color="red"))
+        ], spacing=10)
+    )
 
 ft.app(target=main)
