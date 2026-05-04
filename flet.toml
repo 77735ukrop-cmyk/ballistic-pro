@@ -1,2 +1,3 @@
 name = "BallisticPro"
-module = "ballistic.py"
+description = "UAV Ballistic App"
+main_module = "ballistic"
