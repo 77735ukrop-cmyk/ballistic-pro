@@ -92,4 +92,4 @@ def main(page: ft.Page):
             if r.get("cod") == 200:
                 ent_temp.value = str(r['main']['temp'])
                 ent_press.value = str(r['main']['pressure'])
-                lbl_status.value = f"Погода: {
+                lbl_status.value = f"Погода: {city} оновлена"
