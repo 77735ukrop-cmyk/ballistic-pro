@@ -1,34 +1,30 @@
 import flet as ft
 import math
-import requests
-import traceback # Для відстеження помилок
+import traceback
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v2.5"
+    page.title = "BALLISTIC PRO v2.7"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     
-    # Функція для виводу помилки на екран, якщо все зламається
     def show_critical_error(e):
         page.clean()
         page.add(ft.Text(f"Критична помилка при запуску:\n{e}", color="red", size=20))
         page.update()
 
     try:
-        # Стандартні дані (якщо сховище порожнє)
+        # Стандартні дані
         DEFAULT_ARSENAL = {
             "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
             "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528}
         }
 
-        # Ініціалізація сховища
         if not page.client_storage.contains_key("arsenal"):
             page.client_storage.set("arsenal", DEFAULT_ARSENAL)
         
         arsenal = page.client_storage.get("arsenal")
         cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
-        # Поля введення
         ent_h = ft.TextField(label="Висота (м)", value="1000", keyboard_type=ft.KeyboardType.NUMBER)
         ent_v = ft.TextField(label="V БПЛА (м/с)", value="5", keyboard_type=ft.KeyboardType.NUMBER)
         ent_w = ft.TextField(label="V вітру (+ попутний)", value="0", keyboard_type=ft.KeyboardType.NUMBER)
@@ -40,15 +36,17 @@ def main(page: ft.Page):
         ent_temp = ft.TextField(label="Темп. (°C)", value="15")
         ent_press = ft.TextField(label="Тиск (гПа)", value="1013")
 
-        # Результати
         res_l = ft.Text("0.0 м", size=35, weight="bold", color="red")
         res_angle = ft.Text("0.0°", size=25, color="blue")
         lbl_status = ft.Text("Готовий до роботи", color="yellow")
 
         def get_weather(e):
+            # Безпечний імпорт: викликається тільки при натисканні
+            import requests 
             city = city_dropdown.value
             api_key = "26419f7c6a93b4f4e515dcfcda96586b"
-            url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+            # ОБОВ'ЯЗКОВО HTTPS для Android
+            url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
             try:
                 r = requests.get(url, timeout=5).json()
                 if r.get("cod") == 200:
@@ -92,10 +90,9 @@ def main(page: ft.Page):
             value=cities[0]
         )
 
-        # Додаємо елементи на сторінку
         page.add(
             ft.Column([
-                ft.Text("BALLISTIC PRO v2.5", size=24, weight="bold", color="green"),
+                ft.Text("BALLISTIC PRO v2.7", size=24, weight="bold", color="green"),
                 ent_h, ent_v, ent_w,
                 ft.Divider(),
                 ft.Row([ent_m, ent_cx, ent_s], wrap=True),
