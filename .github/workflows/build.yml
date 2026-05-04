@@ -29,8 +29,7 @@ jobs:
         run: pip install flet requests
 
       - name: Build APK
-        # Використовуємо правильний параметр та вказуємо назву файлу БЕЗ .py
-        run: flet build apk --module-name ballistic
+        run: flet build apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
