@@ -26,14 +26,11 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        run: |
-          pip install flet requests
-          # Додатково встановлюємо сервіси для збірки
-          pip install flet[all] 
+        run: pip install flet requests
 
       - name: Build APK
-        # Виправлена команда згідно з новою документацією Flet
-        run: flet build apk ballistic.py
+        # Використовуємо правильний параметр та вказуємо назву файлу БЕЗ .py
+        run: flet build apk --module-name ballistic
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
