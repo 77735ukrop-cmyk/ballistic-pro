@@ -12,20 +12,25 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Install Dependencies
-        run: |
-          pip install flet requests
+      - name: Install dependencies
+        run: pip install flet requests
 
       - name: Build APK
-        # Ми явно вказуємо, який файл запускати
-        run: flet build apk --module-name ballistic.py
+        # Вказуємо твій файл ballistic.py
+        run: flet build apk --main ballistic.py
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
