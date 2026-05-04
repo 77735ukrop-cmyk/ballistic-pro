@@ -1,49 +1,27 @@
 import flet as ft
 import math
 import requests
-import json
 import os
-import tempfile
 
-# --- РОБОТА З ДАНИМИ (Безпечний метод для Android) ---
-def get_data_path():
-    home = os.environ.get("HOME")
-    if home is not None:
-        return os.path.join(home, "arsenal_data.json")
-    # Якщо HOME порожній, використовуємо стандартну тимчасову папку Android
-    return os.path.join(tempfile.gettempdir(), "arsenal_data.json")
-
-DATA_FILE = get_data_path()
-
+# --- СТАНДАРТНІ ДАНІ ---
 DEFAULT_ARSENAL = {
     "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
     "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528}
 }
-
-def load_arsenal():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r") as f:
-                return json.load(f)
-        except:
-            return DEFAULT_ARSENAL
-    return DEFAULT_ARSENAL
-
-def save_arsenal(data):
-    try:
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f)
-    except:
-        pass
-
-arsenal = load_arsenal()
-cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
     page.title = "BALLISTIC PRO"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = 20
+
+    # --- ЛОГІКА СХОВИЩА (Client Storage) ---
+    # Завантажуємо арсенал з пам'яті додатка або беремо стандартний
+    if not page.client_storage.contains_key("arsenal"):
+        page.client_storage.set("arsenal", DEFAULT_ARSENAL)
+    
+    arsenal = page.client_storage.get("arsenal")
+    cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
     # Поля введення
     ent_h = ft.TextField(label="Висота (м)", value="1000", keyboard_type=ft.KeyboardType.NUMBER)
@@ -57,13 +35,38 @@ def main(page: ft.Page):
     ent_temp = ft.TextField(label="Темп. (°C)", value="15")
     ent_press = ft.TextField(label="Тиск (гПа)", value="1013")
 
+    # Поля для нового БК
     new_name = ft.TextField(label="Назва БК")
     new_m = ft.TextField(label="Маса (кг)")
     new_cx = ft.TextField(label="Cx")
     new_s = ft.TextField(label="S (площа)")
 
+    def refresh_dropdown():
+        current_arsenal = page.client_storage.get("arsenal")
+        ammo_dropdown.options = [ft.dropdown.Option(k) for k in current_arsenal.keys()]
+        page.update()
+
+    def save_bk(e):
+        try:
+            name = new_name.value
+            if name:
+                current_arsenal = page.client_storage.get("arsenal")
+                current_arsenal[name] = {
+                    "m": float(new_m.value), 
+                    "cx": float(new_cx.value), 
+                    "s": float(new_s.value)
+                }
+                page.client_storage.set("arsenal", current_arsenal)
+                refresh_dropdown()
+                lbl_status.value = f"БК '{name}' додано!"
+                page.update()
+        except:
+            lbl_status.value = "Помилка вводу даних"
+            page.update()
+
     def on_ammo_change(e):
-        data = arsenal[ammo_dropdown.value]
+        current_arsenal = page.client_storage.get("arsenal")
+        data = current_arsenal[ammo_dropdown.value]
         ent_m.value = str(data['m'])
         ent_cx.value = str(data['cx'])
         ent_s.value = str(data['s'])
@@ -95,11 +98,11 @@ def main(page: ft.Page):
             if r.get("cod") == 200:
                 ent_temp.value = str(r['main']['temp'])
                 ent_press.value = str(r['main']['pressure'])
-                lbl_status.value = f"Погода: {city} оновлена"
+                lbl_status.value = f"Погода оновлена для {city}"
             else:
-                lbl_status.value = "Помилка погоди"
+                lbl_status.value = "Помилка API"
         except:
-            lbl_status.value = "Немає мережі"
+            lbl_status.value = "Немає інтернету"
         page.update()
 
     def calculate(e):
@@ -111,7 +114,7 @@ def main(page: ft.Page):
             g = 9.81
             k = 0.5 * rho * cx * s
             
-            if k == 0:
+            if k < 0.000001: # Майже нульовий опір
                 t_fall = math.sqrt(2 * h / g)
                 dist_l = (v + w) * t_fall
             else:
@@ -121,7 +124,7 @@ def main(page: ft.Page):
             angle_deg = math.degrees(math.atan(h / dist_l)) if dist_l > 0 else 90
             res_l.value = f"{round(dist_l, 2)} м"
             res_angle.value = f"{round(angle_deg, 2)}°"
-            lbl_status.value = "Розраховано успішно"
+            lbl_status.value = "Успішно"
             page.update()
         except Exception as ex:
             lbl_status.value = f"Помилка: {ex}"
@@ -129,19 +132,26 @@ def main(page: ft.Page):
 
     page.add(
         ft.Column([
-            ft.Text("BALLISTIC PRO v2.3", size=24, weight="bold", color="green"),
+            ft.Text("BALLISTIC PRO v2.4", size=24, weight="bold", color="green"),
             ent_h, ent_v, ent_w,
             ft.Divider(),
             ammo_dropdown,
             ft.Row([ent_m, ent_cx, ent_s], wrap=True),
+            ft.ExpansionTile(
+                title=ft.Text("Керування БК (+ / Редагувати)"),
+                controls=[
+                    new_name, new_m, new_cx, new_s,
+                    ft.ElevatedButton("ЗБЕРЕГТИ БК", on_click=save_bk)
+                ]
+            ),
             ft.Divider(),
             city_dropdown,
-            ft.ElevatedButton("ОНОВИТИ ПОГОДУ", on_click=get_weather),
+            ft.ElevatedButton("ОТРИМАТИ ПОГОДУ", on_click=get_weather),
             ft.Row([ent_temp, ent_press], wrap=True),
             ft.Divider(),
             ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=60, width=400),
-            ft.Text("ДИСТАНЦІЯ СКИДУ:"), res_l,
-            ft.Text("КУТ КАМЕРИ:"), res_angle,
+            ft.Text("ДИСТАНЦІЯ ВИНОСУ:"), res_l,
+            ft.Text("КУТ ДЛЯ КАМЕРИ:"), res_angle,
             lbl_status
         ], spacing=10)
     )
