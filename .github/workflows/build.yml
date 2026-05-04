@@ -19,9 +19,10 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Install Flet
-        run: pip install flet
-
+    - name: Install Dependencies
+        run: |
+          pip install flet requests
+          
       - name: Build APK
         # Вказуємо назву вашого головного файлу
         run: flet build apk --module-name ballistic.py
