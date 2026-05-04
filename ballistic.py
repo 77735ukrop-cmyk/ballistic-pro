@@ -3,12 +3,15 @@ import math
 import requests
 import json
 import os
+import tempfile
 
-# --- РОБОТА З ДАНИМИ (Android-сумісність) ---
+# --- РОБОТА З ДАНИМИ (Безпечний метод для Android) ---
 def get_data_path():
-    if os.environ.get("FLET_PLATFORM") == "android":
-        return os.path.join(os.environ.get("HOME"), "arsenal_data.json")
-    return "arsenal_data.json"
+    home = os.environ.get("HOME")
+    if home is not None:
+        return os.path.join(home, "arsenal_data.json")
+    # Якщо HOME порожній, використовуємо стандартну тимчасову папку Android
+    return os.path.join(tempfile.gettempdir(), "arsenal_data.json")
 
 DATA_FILE = get_data_path()
 
@@ -108,7 +111,6 @@ def main(page: ft.Page):
             g = 9.81
             k = 0.5 * rho * cx * s
             
-            # Уникнення ділення на нуль, якщо k = 0
             if k == 0:
                 t_fall = math.sqrt(2 * h / g)
                 dist_l = (v + w) * t_fall
@@ -127,7 +129,7 @@ def main(page: ft.Page):
 
     page.add(
         ft.Column([
-            ft.Text("BALLISTIC PRO v2.2", size=24, weight="bold", color="green"),
+            ft.Text("BALLISTIC PRO v2.3", size=24, weight="bold", color="green"),
             ent_h, ent_v, ent_w,
             ft.Divider(),
             ammo_dropdown,
