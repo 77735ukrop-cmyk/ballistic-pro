@@ -1,0 +1,5 @@
+[tool.flet]
+app_name = "BallisticPro"
+description = "Ballistic calculator for UAV"
+module = "main"
+android_icon = "assets/icon.png"
