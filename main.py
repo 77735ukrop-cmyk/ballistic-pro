@@ -10,7 +10,7 @@ arsenal = {
 cities = ["Kramatorsk,UA", "Toretsk,UA", "Kostiantynivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v2.8"
+    page.title = "BALLISTIC PRO v2.9"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = 20
@@ -26,12 +26,12 @@ def main(page: ft.Page):
         ent_v = ft.TextField(label="V БПЛА (м/с)", value="5", keyboard_type=ft.KeyboardType.NUMBER)
         ent_w = ft.TextField(label="V вітру (+ попутний)", value="0", keyboard_type=ft.KeyboardType.NUMBER)
         
-        ent_m = ft.TextField(label="Маса (кг)", value="3.1")
-        ent_cx = ft.TextField(label="Cx (опір)", value="0.32")
-        ent_s = ft.TextField(label="S (площа м2)", value="0.0038")
+        ent_m = ft.TextField(label="Маса (кг)", value="3.1", keyboard_type=ft.KeyboardType.NUMBER)
+        ent_cx = ft.TextField(label="Cx (опір)", value="0.32", keyboard_type=ft.KeyboardType.NUMBER)
+        ent_s = ft.TextField(label="S (площа м2)", value="0.0038", keyboard_type=ft.KeyboardType.NUMBER)
         
-        ent_temp = ft.TextField(label="Темп. (°C)", value="15")
-        ent_press = ft.TextField(label="Тиск (гПа)", value="1013")
+        ent_temp = ft.TextField(label="Темп. (°C)", value="15", keyboard_type=ft.KeyboardType.NUMBER)
+        ent_press = ft.TextField(label="Тиск (гПа)", value="1013", keyboard_type=ft.KeyboardType.NUMBER)
 
         # Поля для додавання БК
         new_name = ft.TextField(label="Назва БК")
@@ -50,28 +50,37 @@ def main(page: ft.Page):
         def save_bk(e):
             name = new_name.value
             if name:
+                # Захист від введення з комою замість крапки
                 arsenal[name] = {
-                    "m": float(new_m.value), 
-                    "cx": float(new_cx.value), 
-                    "s": float(new_s.value)
+                    "m": float(new_m.value.replace(",", ".")), 
+                    "cx": float(new_cx.value.replace(",", ".")), 
+                    "s": float(new_s.value.replace(",", "."))
                 }
                 refresh_dropdown()
                 lbl_status.value = f"БК '{name}' додано на час сесії!"
                 page.update()
 
         def on_ammo_change(e):
-            data = arsenal[ammo_dropdown.value]
+            data = arsenal.get(ammo_dropdown.value, arsenal["ОГБ-1"])
             ent_m.value = str(data['m'])
             ent_cx.value = str(data['cx'])
             ent_s.value = str(data['s'])
             page.update()
 
+        # Створюємо меню БЕЗ параметра on_change
         ammo_dropdown = ft.Dropdown(
             label="Оберіть БК",
             options=[ft.dropdown.Option(k) for k in arsenal.keys()],
-            value="ОГБ-1",
-            on_change=on_ammo_change
+            value="ОГБ-1"
         )
+        
+        # Безпечне призначення події (працюватиме на будь-якій версії Flet)
+        if hasattr(ammo_dropdown, 'on_change'):
+            ammo_dropdown.on_change = on_ammo_change
+        if hasattr(ammo_dropdown, 'on_select'):
+            ammo_dropdown.on_select = on_ammo_change
+        if hasattr(ammo_dropdown, 'on_text_change'):
+            ammo_dropdown.on_text_change = on_ammo_change
         
         city_dropdown = ft.Dropdown(
             label="Локація",
@@ -98,9 +107,15 @@ def main(page: ft.Page):
 
         def calculate(e):
             try:
-                m, cx, s = float(ent_m.value), float(ent_cx.value), float(ent_s.value)
-                h, v, w = float(ent_h.value), float(ent_v.value), float(ent_w.value)
-                t, p = float(ent_temp.value), float(ent_press.value)
+                # Читаємо значення, автоматично замінюючи кому на крапку (якщо користувач помилився)
+                m = float(ent_m.value.replace(",", "."))
+                cx = float(ent_cx.value.replace(",", "."))
+                s = float(ent_s.value.replace(",", "."))
+                h = float(ent_h.value.replace(",", "."))
+                v = float(ent_v.value.replace(",", "."))
+                w = float(ent_w.value.replace(",", "."))
+                t = float(ent_temp.value.replace(",", "."))
+                p = float(ent_press.value.replace(",", "."))
                 
                 rho = (p * 100) / (287.05 * (t + 273.15))
                 g = 9.81
@@ -118,12 +133,12 @@ def main(page: ft.Page):
                 res_angle.value = f"{round(angle_deg, 2)}°"
                 lbl_status.value = "Успіх"
             except Exception as ex:
-                lbl_status.value = f"Помилка: {ex}"
+                lbl_status.value = f"Помилка даних: {ex}"
             page.update()
 
         page.add(
             ft.Column([
-                ft.Text("BALLISTIC PRO v2.8", size=24, weight="bold", color="green"),
+                ft.Text("BALLISTIC PRO v2.9", size=24, weight="bold", color="green"),
                 ent_h, ent_v, ent_w,
                 ft.Divider(),
                 ammo_dropdown,
