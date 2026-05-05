@@ -1,8 +1,15 @@
 import flet as ft
 import math
+import os
+import json
 
-# --- ПОВНА БАЗА ДАНИХ АРСЕНАЛУ ---
-arsenal = {
+# --- НАДІЙНА ПАМ'ЯТЬ ДЛЯ ANDROID ---
+# Беремо шлях до папки, де встановлений сам додаток (тут система завжди дозволяє запис)
+APP_DIR = os.path.dirname(__file__)
+DATA_FILE = os.path.join(APP_DIR, "arsenal.json")
+
+# Стандартна база, яка завантажується перший раз або якщо файл пам'яті порожній
+BASE_ARSENAL = {
     "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
     "MOA-120": {"m": 1.59, "cx": 0.25, "s": 0.00212},
     "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528},
@@ -12,10 +19,30 @@ arsenal = {
     "БЦ-4500": {"m": 5.6, "cx": 0.48, "s": 0.00709}
 }
 
+# Функція завантаження з пам'яті
+def load_arsenal():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return BASE_ARSENAL.copy()
+
+# Функція збереження в пам'ять
+def save_arsenal(data):
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+
+# Завантажуємо арсенал при старті
+arsenal = load_arsenal()
 cities = ["Kramatorsk,UA", "Kostiantynivka,UA", "Toretsk,UA", "Horlivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.5"
+    page.title = "BALLISTIC PRO v3.6"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
@@ -37,7 +64,9 @@ def main(page: ft.Page):
         lbl_s = ft.TextField(label="S (м²)", value="0.00528", read_only=True, expand=True, text_size=12)
 
         def on_ammo_change(e):
-            data = arsenal.get(ammo_dropdown.value, arsenal["MOA-400"])
+            # Якщо з якоїсь причини БК немає в словнику, беремо перший ліпший
+            safe_val = ammo_dropdown.value if ammo_dropdown.value in arsenal else list(arsenal.keys())[0]
+            data = arsenal[safe_val]
             lbl_m.value = str(data['m'])
             lbl_cx.value = str(data['cx'])
             lbl_s.value = str(data['s'])
@@ -45,36 +74,68 @@ def main(page: ft.Page):
 
         ammo_dropdown = ft.Dropdown(
             options=[ft.dropdown.Option(k) for k in arsenal.keys()],
-            value="MOA-400",
+            value=list(arsenal.keys())[0],
             expand=True
         )
         
         if hasattr(ammo_dropdown, 'on_change'): ammo_dropdown.on_change = on_ammo_change
         elif hasattr(ammo_dropdown, 'on_select'): ammo_dropdown.on_select = on_ammo_change
 
-        # --- ДІАЛОГ ДОДАВАННЯ БК ---
+        # --- ДІАЛОГ ДОДАВАННЯ/РЕДАГУВАННЯ БК ---
         dlg_name = ft.TextField(label="Назва")
         dlg_m = ft.TextField(label="Маса", keyboard_type=ft.KeyboardType.NUMBER)
         dlg_cx = ft.TextField(label="Cx", keyboard_type=ft.KeyboardType.NUMBER)
         dlg_s = ft.TextField(label="S", keyboard_type=ft.KeyboardType.NUMBER)
 
+        def open_editor(e):
+            # Коли відкриваємо редактор, підтягуємо дані вибраного БК
+            curr = ammo_dropdown.value
+            if curr in arsenal:
+                dlg_name.value = curr
+                dlg_m.value = str(arsenal[curr]['m'])
+                dlg_cx.value = str(arsenal[curr]['cx'])
+                dlg_s.value = str(arsenal[curr]['s'])
+            add_bk_dialog.open = True
+            page.update()
+
         def save_bk(e):
             if dlg_name.value:
+                # Зберігаємо або оновлюємо дані
                 arsenal[dlg_name.value] = {
                     "m": float(dlg_m.value.replace(",", ".")), 
                     "cx": float(dlg_cx.value.replace(",", ".")), 
                     "s": float(dlg_s.value.replace(",", "."))
                 }
+                save_arsenal(arsenal) # ЗАПИСУЄМО В ПАМ'ЯТЬ ТЕЛЕФОНУ
+                
+                # Оновлюємо список
                 ammo_dropdown.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
                 ammo_dropdown.value = dlg_name.value
                 on_ammo_change(None)
                 add_bk_dialog.open = False
                 page.update()
 
+        def delete_bk(e):
+            name = dlg_name.value
+            # Забороняємо видаляти, якщо це останній БК в списку
+            if name in arsenal and len(arsenal) > 1:
+                del arsenal[name]
+                save_arsenal(arsenal) # ЗАПИСУЄМО ЗМІНИ В ПАМ'ЯТЬ
+                
+                ammo_dropdown.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
+                ammo_dropdown.value = ammo_dropdown.options[0].key
+                on_ammo_change(None)
+            add_bk_dialog.open = False
+            page.update()
+
         add_bk_dialog = ft.AlertDialog(
-            title=ft.Text("Новий БК"),
+            title=ft.Text("Редактор БК"),
             content=ft.Column([dlg_name, dlg_m, dlg_cx, dlg_s], tight=True),
-            actions=[ft.TextButton("Зберегти", on_click=save_bk)]
+            actions=[
+                ft.TextButton("❌ Видалити", on_click=delete_bk),
+                ft.TextButton("✅ Зберегти", on_click=save_bk)
+            ],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN
         )
         page.overlay.append(add_bk_dialog)
 
@@ -84,12 +145,11 @@ def main(page: ft.Page):
             value="Horlivka,UA",
             expand=True
         )
-        # Нове поле для ручного вводу міста
-        ent_custom_city = ft.TextField(label="Інше (напр. Dnipro)", expand=True)
+        ent_custom_city = ft.TextField(label="Інше місто (напр. Kyiv)", expand=True)
         
         ent_temp = ft.TextField(label="t (°C)", value="6.95", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_press = ft.TextField(label="P (гПа)", value="1016", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        lbl_rho = ft.Text("ρ: 1.26364", color="cyan", weight="bold")
+        lbl_rho = ft.Text("ρ: 1.26364", color="#90CAF9", weight="bold")
         lbl_status = ft.Text("", size=11)
 
         def get_weather(e):
@@ -144,6 +204,7 @@ def main(page: ft.Page):
                 res_time.value = f"{round(t_fall, 3)} с"
                 res_dist.value = f"{round(dist_l, 2)} м"
                 res_angle.value = f"{round(math.degrees(math.atan(h/dist_l)), 2)}°"
+                lbl_status.value = ""
             except: 
                 lbl_status.value = "Помилка даних!"
                 lbl_status.color = "red"
@@ -152,7 +213,7 @@ def main(page: ft.Page):
         # === КОМПОНУВАННЯ ===
         page.add(
             ft.Column([
-                # Секція Вхідних Даних (кольори замінені на HEX-коди або текстові назви)
+                # Секція Вхідних Даних
                 ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color="#90CAF9"),
                 ft.Row([ent_h, ent_v, ent_w]),
                 
@@ -160,7 +221,7 @@ def main(page: ft.Page):
                 
                 # Секція Арсеналу
                 ft.Text("АРСЕНАЛ", weight="bold", size=16, color="#90CAF9"),
-                ft.Row([ammo_dropdown, ft.ElevatedButton("+ БК", on_click=lambda _: setattr(add_bk_dialog, "open", True) or page.update())]),
+                ft.Row([ammo_dropdown, ft.ElevatedButton("⚙️ БК", on_click=open_editor)]),
                 ft.Row([lbl_m, lbl_cx, lbl_s]),
                 
                 ft.Divider(height=15, color="transparent"),
@@ -174,7 +235,7 @@ def main(page: ft.Page):
                 
                 ft.Divider(height=15, color="transparent"),
                 
-                # Кнопка Розрахувати (колір змінено на текстовий)
+                # Кнопка Розрахувати
                 ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=50, width=400),
                 
                 ft.Divider(height=10, color="transparent"),
@@ -193,6 +254,10 @@ def main(page: ft.Page):
                 )
             ], spacing=5)
         )
+        
+        # Викликаємо on_change, щоб заповнити поля БК при старті
+        on_ammo_change(None)
+        
     except Exception as fatal_e:
         show_critical_error(fatal_e)
 
