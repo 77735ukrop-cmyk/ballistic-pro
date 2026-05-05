@@ -15,7 +15,7 @@ arsenal = {
 cities = ["Kramatorsk,UA", "Kostiantynivka,UA", "Toretsk,UA", "Horlivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.4"
+    page.title = "BALLISTIC PRO v3.5"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
@@ -89,13 +89,12 @@ def main(page: ft.Page):
         
         ent_temp = ft.TextField(label="t (°C)", value="6.95", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_press = ft.TextField(label="P (гПа)", value="1016", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        lbl_rho = ft.Text("ρ: 1.26364", color=ft.colors.BLUE_200, weight="bold")
+        lbl_rho = ft.Text("ρ: 1.26364", color="cyan", weight="bold")
         lbl_status = ft.Text("", size=11)
 
         def get_weather(e):
             try:
                 import requests 
-                # Логіка: якщо введено своє місто - беремо його, інакше беремо з випадаючого списку
                 target_city = ent_custom_city.value.strip()
                 if not target_city:
                     target_city = city_dropdown.value
@@ -105,11 +104,14 @@ def main(page: ft.Page):
                 if r.get("cod") == 200:
                     ent_temp.value = str(r['main']['temp'])
                     ent_press.value = str(r['main']['pressure'])
-                    lbl_status.value = f"OK: {r['name']}" # Показуємо, яке місто знайшло
+                    lbl_status.value = f"OK: {r['name']}"
+                    lbl_status.color = "green"
                 else: 
                     lbl_status.value = "Місто не знайдено"
+                    lbl_status.color = "red"
             except: 
                 lbl_status.value = "Немає мережі"
+                lbl_status.color = "red"
             page.update()
 
         # === РЕЗУЛЬТАТИ ===
@@ -142,36 +144,38 @@ def main(page: ft.Page):
                 res_time.value = f"{round(t_fall, 3)} с"
                 res_dist.value = f"{round(dist_l, 2)} м"
                 res_angle.value = f"{round(math.degrees(math.atan(h/dist_l)), 2)}°"
-            except: lbl_status.value = "Помилка даних!"
+            except: 
+                lbl_status.value = "Помилка даних!"
+                lbl_status.color = "red"
             page.update()
 
         # === КОМПОНУВАННЯ ===
         page.add(
             ft.Column([
-                # Секція Вхідних Даних
-                ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color=ft.colors.BLUE_200),
+                # Секція Вхідних Даних (кольори замінені на HEX-коди або текстові назви)
+                ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color="#90CAF9"),
                 ft.Row([ent_h, ent_v, ent_w]),
                 
                 ft.Divider(height=15, color="transparent"),
                 
                 # Секція Арсеналу
-                ft.Text("АРСЕНАЛ", weight="bold", size=16, color=ft.colors.BLUE_200),
+                ft.Text("АРСЕНАЛ", weight="bold", size=16, color="#90CAF9"),
                 ft.Row([ammo_dropdown, ft.ElevatedButton("+ БК", on_click=lambda _: setattr(add_bk_dialog, "open", True) or page.update())]),
                 ft.Row([lbl_m, lbl_cx, lbl_s]),
                 
                 ft.Divider(height=15, color="transparent"),
                 
                 # Секція Метео
-                ft.Text("МЕТЕО", weight="bold", size=16, color=ft.colors.BLUE_200),
-                ft.Row([city_dropdown, ent_custom_city]), # Додано поле поруч зі списком
+                ft.Text("МЕТЕО", weight="bold", size=16, color="#90CAF9"),
+                ft.Row([city_dropdown, ent_custom_city]), 
                 ft.ElevatedButton("ОНОВИТИ ПОГОДУ", on_click=get_weather, width=400),
                 ft.Row([ent_temp, ent_press]),
                 ft.Row([lbl_rho, lbl_status]),
                 
                 ft.Divider(height=15, color="transparent"),
                 
-                # Кнопка Розрахувати
-                ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor=ft.colors.GREEN_800, color="white", height=50, width=400),
+                # Кнопка Розрахувати (колір змінено на текстовий)
+                ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=50, width=400),
                 
                 ft.Divider(height=10, color="transparent"),
 
