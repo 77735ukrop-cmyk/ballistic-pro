@@ -15,10 +15,10 @@ arsenal = {
 cities = ["Kramatorsk,UA", "Kostiantynivka,UA", "Toretsk,UA", "Horlivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.2"
+    page.title = "BALLISTIC PRO v3.4"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
-    page.padding = 15
+    page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
     
     def show_critical_error(e):
         page.clean()
@@ -84,22 +84,32 @@ def main(page: ft.Page):
             value="Horlivka,UA",
             expand=True
         )
+        # Нове поле для ручного вводу міста
+        ent_custom_city = ft.TextField(label="Інше (напр. Dnipro)", expand=True)
+        
         ent_temp = ft.TextField(label="t (°C)", value="6.95", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_press = ft.TextField(label="P (гПа)", value="1016", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        lbl_rho = ft.Text("ρ: 1.26364", color="cyan", weight="bold")
+        lbl_rho = ft.Text("ρ: 1.26364", color=ft.colors.BLUE_200, weight="bold")
         lbl_status = ft.Text("", size=11)
 
         def get_weather(e):
             try:
                 import requests 
-                url = f"https://api.openweathermap.org/data/2.5/weather?q={city_dropdown.value}&appid=26419f7c6a93b4f4e515dcfcda96586b&units=metric"
+                # Логіка: якщо введено своє місто - беремо його, інакше беремо з випадаючого списку
+                target_city = ent_custom_city.value.strip()
+                if not target_city:
+                    target_city = city_dropdown.value
+                
+                url = f"https://api.openweathermap.org/data/2.5/weather?q={target_city}&appid=26419f7c6a93b4f4e515dcfcda96586b&units=metric"
                 r = requests.get(url, timeout=5).json()
                 if r.get("cod") == 200:
                     ent_temp.value = str(r['main']['temp'])
                     ent_press.value = str(r['main']['pressure'])
-                    lbl_status.value = "Погода OK"
-                else: lbl_status.value = "Помилка API"
-            except: lbl_status.value = "Немає мережі"
+                    lbl_status.value = f"OK: {r['name']}" # Показуємо, яке місто знайшло
+                else: 
+                    lbl_status.value = "Місто не знайдено"
+            except: 
+                lbl_status.value = "Немає мережі"
             page.update()
 
         # === РЕЗУЛЬТАТИ ===
@@ -109,7 +119,9 @@ def main(page: ft.Page):
 
         def calculate(e):
             try:
-                m, cx, s = float(lbl_m.value), float(lbl_cx.value), float(lbl_s.value)
+                m = float(lbl_m.value.replace(",", "."))
+                cx = float(lbl_cx.value.replace(",", "."))
+                s = float(lbl_s.value.replace(",", "."))
                 h = float(ent_h.value.replace(",", "."))
                 v = float(ent_v.value.replace(",", "."))
                 w = float(ent_w.value.replace(",", "."))
@@ -136,23 +148,33 @@ def main(page: ft.Page):
         # === КОМПОНУВАННЯ ===
         page.add(
             ft.Column([
+                # Секція Вхідних Даних
+                ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color=ft.colors.BLUE_200),
                 ft.Row([ent_h, ent_v, ent_w]),
-                ft.Divider(color="grey"),
-                ft.Text("АРСЕНАЛ", weight="bold"),
                 
-                # Замінили іконку на звичайну кнопку
+                ft.Divider(height=15, color="transparent"),
+                
+                # Секція Арсеналу
+                ft.Text("АРСЕНАЛ", weight="bold", size=16, color=ft.colors.BLUE_200),
                 ft.Row([ammo_dropdown, ft.ElevatedButton("+ БК", on_click=lambda _: setattr(add_bk_dialog, "open", True) or page.update())]),
-                
                 ft.Row([lbl_m, lbl_cx, lbl_s]),
-                ft.Divider(color="grey"),
-                ft.Text("МЕТЕО", weight="bold"),
-                ft.Row([city_dropdown]),
+                
+                ft.Divider(height=15, color="transparent"),
+                
+                # Секція Метео
+                ft.Text("МЕТЕО", weight="bold", size=16, color=ft.colors.BLUE_200),
+                ft.Row([city_dropdown, ent_custom_city]), # Додано поле поруч зі списком
                 ft.ElevatedButton("ОНОВИТИ ПОГОДУ", on_click=get_weather, width=400),
                 ft.Row([ent_temp, ent_press]),
                 ft.Row([lbl_rho, lbl_status]),
-                ft.Divider(color="grey"),
-                ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=50, width=400),
                 
+                ft.Divider(height=15, color="transparent"),
+                
+                # Кнопка Розрахувати
+                ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor=ft.colors.GREEN_800, color="white", height=50, width=400),
+                
+                ft.Divider(height=10, color="transparent"),
+
                 # Таблиця результатів
                 ft.Container(
                     padding=10, border=ft.border.all(1, "grey"), border_radius=10,
@@ -162,11 +184,10 @@ def main(page: ft.Page):
                             ft.Column([ft.Text("ВІДСТАНЬ", size=10), res_dist], expand=True, horizontal_alignment="center"),
                         ]),
                         ft.Divider(),
-                        # Замінили іконку на емодзі
                         ft.Row([ft.Text("📷 КУТ КАМЕРИ:", size=12), res_angle], alignment="center")
                     ])
                 )
-            ], spacing=10)
+            ], spacing=5)
         )
     except Exception as fatal_e:
         show_critical_error(fatal_e)
