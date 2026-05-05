@@ -15,18 +15,18 @@ arsenal = {
 cities = ["Kramatorsk,UA", "Kostiantynivka,UA", "Toretsk,UA", "Horlivka,UA", "Donetsk,UA"]
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.1"
+    page.title = "BALLISTIC PRO v3.2"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = 15
     
     def show_critical_error(e):
         page.clean()
-        page.add(ft.Text(f"Помилка компоновки:\n{e}", color="red", size=20))
+        page.add(ft.Text(f"Помилка при запуску:\n{e}", color="red", size=20))
         page.update()
 
     try:
-        # === ВЕРХНІЙ БЛОК: ВХІДНІ ДАНІ (з expand=True для стабільності) ===
+        # === ВЕРХНІЙ БЛОК: ВХІДНІ ДАНІ ===
         ent_h = ft.TextField(label="Висота(м)", value="1500", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_v = ft.TextField(label="БПЛА(м/с)", value="25", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_w = ft.TextField(label="Вітер(м/с)", value="-10", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
@@ -49,7 +49,6 @@ def main(page: ft.Page):
             expand=True
         )
         
-        # Безпечне підключення події вибору БК
         if hasattr(ammo_dropdown, 'on_change'): ammo_dropdown.on_change = on_ammo_change
         elif hasattr(ammo_dropdown, 'on_select'): ammo_dropdown.on_select = on_ammo_change
 
@@ -140,7 +139,10 @@ def main(page: ft.Page):
                 ft.Row([ent_h, ent_v, ent_w]),
                 ft.Divider(color="grey"),
                 ft.Text("АРСЕНАЛ", weight="bold"),
-                ft.Row([ammo_dropdown, ft.IconButton(ft.icons.ADD_CIRCLE, on_click=lambda _: setattr(add_bk_dialog, "open", True) or page.update())]),
+                
+                # Замінили іконку на звичайну кнопку
+                ft.Row([ammo_dropdown, ft.ElevatedButton("+ БК", on_click=lambda _: setattr(add_bk_dialog, "open", True) or page.update())]),
+                
                 ft.Row([lbl_m, lbl_cx, lbl_s]),
                 ft.Divider(color="grey"),
                 ft.Text("МЕТЕО", weight="bold"),
@@ -160,7 +162,8 @@ def main(page: ft.Page):
                             ft.Column([ft.Text("ВІДСТАНЬ", size=10), res_dist], expand=True, horizontal_alignment="center"),
                         ]),
                         ft.Divider(),
-                        ft.Row([ft.Icon(ft.icons.CAMERA), ft.Text("КУТ:"), res_angle], alignment="center")
+                        # Замінили іконку на емодзі
+                        ft.Row([ft.Text("📷 КУТ КАМЕРИ:", size=12), res_angle], alignment="center")
                     ])
                 )
             ], spacing=10)
