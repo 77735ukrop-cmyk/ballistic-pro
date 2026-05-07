@@ -2,4 +2,9 @@
 app_name = "BallisticPro"
 description = "Ballistic calculator for UAV"
 module = "main"
+
+# Офіційна версія релізу
+version = "1.0"
+
+# Шлях до вашого тактичного значка
 android_icon = "assets/icon.png"
