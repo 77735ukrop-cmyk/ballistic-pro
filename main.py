@@ -8,7 +8,7 @@ APP_DIR = os.path.dirname(__file__)
 ARSENAL_FILE = os.path.join(APP_DIR, "arsenal.json")
 CITIES_FILE = os.path.join(APP_DIR, "cities.json")
 
-# СТАНДАРТНІ БАЗИ (Відновлені повністю!)
+# СТАНДАРТНІ БАЗИ
 BASE_ARSENAL = {
     "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
     "MOA-120": {"m": 1.59, "cx": 0.25, "s": 0.00212},
@@ -41,11 +41,11 @@ arsenal = load_data(ARSENAL_FILE, BASE_ARSENAL)
 cities_list = load_data(CITIES_FILE, BASE_CITIES)
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.9.2"
+    page.title = "BALLISTIC PRO v4.0"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
-    
+
     try:
         # === ВЕРХНІЙ БЛОК: ВХІДНІ ДАНІ ===
         ent_h = ft.TextField(label="Висота(м)", value="1500", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
@@ -53,35 +53,161 @@ def main(page: ft.Page):
         ent_w_drone = ft.TextField(label="Вітер Висота", value="-10", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
 
         # === БЛОК: АРСЕНАЛ ===
-        lbl_m = ft.TextField(label="m (кг)", value="3.1", read_only=True, expand=True, text_size=12)
-        lbl_cx = ft.TextField(label="Cx", value="0.32", read_only=True, expand=True, text_size=12)
-        lbl_s = ft.TextField(label="S (м²)", value="0.0038", read_only=True, expand=True, text_size=12)
+        lbl_m = ft.TextField(label="m (кг)", value="", read_only=True, expand=True, text_size=12)
+        lbl_cx = ft.TextField(label="Cx", value="", read_only=True, expand=True, text_size=12)
+        lbl_s = ft.TextField(label="S (м²)", value="", read_only=True, expand=True, text_size=12)
 
         ammo_dropdown = ft.Dropdown(
             options=[ft.dropdown.Option(k) for k in arsenal.keys()],
             value=list(arsenal.keys())[0], expand=True
         )
-        
+
+        # ВИПРАВЛЕНО: Надійне оновлення полів БК (як у версії 3.6)
         def on_ammo_change(e):
-            d = arsenal.get(ammo_dropdown.value, list(arsenal.values())[0])
+            safe_val = ammo_dropdown.value if ammo_dropdown.value in arsenal else list(arsenal.keys())[0]
+            d = arsenal[safe_val]
             lbl_m.value = str(d['m'])
             lbl_cx.value = str(d['cx'])
             lbl_s.value = str(d['s'])
             page.update()
-            
-        ammo_dropdown.on_change = on_ammo_change
+
+        if hasattr(ammo_dropdown, 'on_change'): ammo_dropdown.on_change = on_ammo_change
+        elif hasattr(ammo_dropdown, 'on_select'): ammo_dropdown.on_select = on_ammo_change
+
+        # --- ДІАЛОГ АРСЕНАЛУ ---
+        current_editing_bk = [None]
+        dlg_name = ft.TextField(label="Назва")
+        dlg_m = ft.TextField(label="Маса", keyboard_type=ft.KeyboardType.NUMBER)
+        dlg_cx = ft.TextField(label="Cx", keyboard_type=ft.KeyboardType.NUMBER)
+        dlg_s = ft.TextField(label="S", keyboard_type=ft.KeyboardType.NUMBER)
+
+        def open_new_bk(e):
+            current_editing_bk[0] = None
+            dlg_name.value = ""
+            dlg_m.value = ""
+            dlg_cx.value = ""
+            dlg_s.value = ""
+            add_bk_dialog.title.value = "Новий БК"
+            add_bk_dialog.open = True
+            page.update()
+
+        def open_edit_bk(e):
+            curr = ammo_dropdown.value
+            if curr in arsenal:
+                current_editing_bk[0] = curr
+                dlg_name.value = curr
+                dlg_m.value = str(arsenal[curr]['m'])
+                dlg_cx.value = str(arsenal[curr]['cx'])
+                dlg_s.value = str(arsenal[curr]['s'])
+                add_bk_dialog.title.value = "Редагувати БК"
+                add_bk_dialog.open = True
+                page.update()
+
+        def save_bk(e):
+            new_name = dlg_name.value.strip()
+            if new_name:
+                old_name = current_editing_bk[0]
+                if old_name and old_name != new_name and old_name in arsenal:
+                    del arsenal[old_name]
+                arsenal[new_name] = {
+                    "m": float(dlg_m.value.replace(",", ".")),
+                    "cx": float(dlg_cx.value.replace(",", ".")),
+                    "s": float(dlg_s.value.replace(",", "."))
+                }
+                save_data(ARSENAL_FILE, arsenal)
+                ammo_dropdown.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
+                ammo_dropdown.value = new_name
+                on_ammo_change(None)
+                add_bk_dialog.open = False
+                page.update()
+
+        def delete_bk(e):
+            name = dlg_name.value.strip()
+            if name in arsenal and len(arsenal) > 1:
+                del arsenal[name]
+                save_data(ARSENAL_FILE, arsenal)
+                ammo_dropdown.options = [ft.dropdown.Option(k) for k in arsenal.keys()]
+                ammo_dropdown.value = ammo_dropdown.options[0].key
+                on_ammo_change(None)
+            add_bk_dialog.open = False
+            page.update()
+
+        add_bk_dialog = ft.AlertDialog(
+            title=ft.Text(""),
+            content=ft.Column([dlg_name, dlg_m, dlg_cx, dlg_s], tight=True),
+            actions=[
+                ft.TextButton("❌ Видалити", on_click=delete_bk),
+                ft.TextButton("✅ Зберегти", on_click=save_bk)
+            ],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+        )
+        page.overlay.append(add_bk_dialog)
 
         # === БЛОК: МЕТЕО ===
-        city_dropdown = ft.Dropdown(options=[ft.dropdown.Option(c) for c in cities_list], value=cities_list[0], expand=True)
+        city_dropdown = ft.Dropdown(options=[ft.dropdown.Option(c) for c in cities_list], value=cities_list[0] if cities_list else "", expand=True)
         ent_temp = ft.TextField(label="t (°C)", value="20", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_press = ft.TextField(label="P (гПа)", value="1013", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_w_ground = ft.TextField(label="Вітер Земля", value="-2", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         lbl_rho = ft.Text("ρ: ---", color="#90CAF9", weight="bold")
         lbl_status = ft.Text("", size=11)
 
+        # --- ДІАЛОГ МІСТ ---
+        current_editing_city = [None]
+        dlg_city_name = ft.TextField(label="Місто (напр. Dnipro,UA)")
+
+        def open_new_city(e):
+            current_editing_city[0] = None
+            dlg_city_name.value = ""
+            city_dialog.title.value = "Нове місто"
+            city_dialog.open = True
+            page.update()
+
+        def open_edit_city(e):
+            curr = city_dropdown.value
+            current_editing_city[0] = curr
+            dlg_city_name.value = curr
+            city_dialog.title.value = "Редагувати місто"
+            city_dialog.open = True
+            page.update()
+
+        def save_city(e):
+            new_city = dlg_city_name.value.strip()
+            if new_city:
+                old_city = current_editing_city[0]
+                if old_city and old_city != new_city and old_city in cities_list:
+                    cities_list.remove(old_city)
+                if new_city not in cities_list:
+                    cities_list.append(new_city)
+                save_data(CITIES_FILE, cities_list)
+                city_dropdown.options = [ft.dropdown.Option(c) for c in cities_list]
+                city_dropdown.value = new_city
+                city_dialog.open = False
+                page.update()
+
+        def delete_city(e):
+            city = dlg_city_name.value.strip()
+            if city in cities_list and len(cities_list) > 1:
+                cities_list.remove(city)
+                save_data(CITIES_FILE, cities_list)
+                city_dropdown.options = [ft.dropdown.Option(c) for c in cities_list]
+                city_dropdown.value = cities_list[0]
+            city_dialog.open = False
+            page.update()
+
+        city_dialog = ft.AlertDialog(
+            title=ft.Text(""),
+            content=ft.Column([dlg_city_name], tight=True),
+            actions=[
+                ft.TextButton("❌ Видалити", on_click=delete_city),
+                ft.TextButton("✅ Зберегти", on_click=save_city)
+            ],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+        )
+        page.overlay.append(city_dialog)
+
         def get_weather(e):
             try:
-                import requests 
+                import requests
                 url = f"https://api.openweathermap.org/data/2.5/weather?q={city_dropdown.value}&appid=26419f7c6a93b4f4e515dcfcda96586b&units=metric"
                 r = requests.get(url, timeout=5).json()
                 if r.get("cod") == 200:
@@ -90,18 +216,18 @@ def main(page: ft.Page):
                     ent_w_ground.value = str(r['wind']['speed'])
                     lbl_status.value = f"OK: {r['name']}"
                     lbl_status.color = "green"
-                else: 
+                else:
                     lbl_status.value = "Помилка API"
                     lbl_status.color = "red"
-            except: 
+            except:
                 lbl_status.value = "Немає мережі"
                 lbl_status.color = "red"
             page.update()
 
         # === РЕЗУЛЬТАТИ ===
-        res_time = ft.Text("--")
-        res_dist = ft.Text("--", color="red")
-        res_angle = ft.Text("--", color="blue")
+        res_time = ft.Text("--", size=24, weight="bold")
+        res_dist = ft.Text("--", size=24, weight="bold", color="red")
+        res_angle = ft.Text("--", size=20, color="blue")
 
         def calculate(e):
             try:
@@ -114,43 +240,42 @@ def main(page: ft.Page):
                 w_low = float(ent_w_ground.value.replace(",", "."))
                 temp = float(ent_temp.value.replace(",", "."))
                 press = float(ent_press.value.replace(",", "."))
-                
+
                 rho = (press * 100) / (287.05 * (temp + 273.15))
                 lbl_rho.value = f"ρ: {round(rho, 5)}"
                 g = 9.81
                 k = 0.5 * rho * cx * s
-                
-                # --- СИМУЛЯЦІЯ З ГРАДІЄНТОМ ВІТРУ ---
+
                 dt = 0.01
                 x = 0.0
                 y = 0.0
                 vx = v_drone
                 vy = 0.0
                 t_fall = 0.0
-                
+
                 while y < h:
                     curr_w = w_high + (w_low - w_high) * (y / h)
-                    
                     v_air_x = vx - curr_w
                     v_air_y = vy
                     V_total = math.sqrt(v_air_x**2 + v_air_y**2)
-                    
+
                     ax = -(k / m) * V_total * v_air_x
                     ay = g - (k / m) * V_total * v_air_y
-                    
+
                     vx += ax * dt
                     vy += ay * dt
                     x += vx * dt
                     y += vy * dt
                     t_fall += dt
-                    
-                    if t_fall > 120: 
+
+                    if t_fall > 120:
                         break
-                
+
                 res_time.value = f"{round(t_fall, 3)} с"
                 res_dist.value = f"{round(x, 2)} м"
                 res_angle.value = f"{round(math.degrees(math.atan(h/x)), 2)}°" if x > 0 else "90°"
-            except: 
+                lbl_status.value = ""
+            except:
                 lbl_status.value = "Помилка даних!"
                 lbl_status.color = "red"
             page.update()
@@ -160,19 +285,21 @@ def main(page: ft.Page):
             ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color="#90CAF9"),
             ft.Row([ent_h, ent_v, ent_w_drone]),
             ft.Divider(height=15, color="transparent"),
-            
+
             ft.Text("АРСЕНАЛ", weight="bold", size=16, color="#90CAF9"),
-            ft.Row([ammo_dropdown, ft.ElevatedButton("➕", width=50), ft.ElevatedButton("⚙️", width=50)]),
+            # ВИПРАВЛЕНО: Повернув on_click для кнопок
+            ft.Row([ammo_dropdown, ft.ElevatedButton("➕", on_click=open_new_bk, width=50), ft.ElevatedButton("⚙️", on_click=open_edit_bk, width=50)]),
             ft.Row([lbl_m, lbl_cx, lbl_s]),
             ft.Divider(height=15, color="transparent"),
-            
+
             ft.Text("МЕТЕО", weight="bold", size=16, color="#90CAF9"),
-            ft.Row([city_dropdown, ft.ElevatedButton("➕", width=50), ft.ElevatedButton("⚙️", width=50)]),
+            # ВИПРАВЛЕНО: Повернув on_click для кнопок міст
+            ft.Row([city_dropdown, ft.ElevatedButton("➕", on_click=open_new_city, width=50), ft.ElevatedButton("⚙️", on_click=open_edit_city, width=50)]),
             ft.ElevatedButton("ОНОВИТИ ПОГОДУ", on_click=get_weather, width=400),
             ft.Row([ent_temp, ent_press, ent_w_ground]),
             ft.Row([lbl_rho, lbl_status]),
             ft.Divider(height=15, color="transparent"),
-            
+
             ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=50, width=400),
             ft.Container(padding=10, border=ft.border.all(1, "grey"), border_radius=10, content=ft.Column([
                 ft.Row([
@@ -183,10 +310,11 @@ def main(page: ft.Page):
                 ft.Row([ft.Text("📷 КУТ КАМЕРИ:", size=12), res_angle], alignment="center")
             ]))
         ], spacing=5))
-        
+
+        # Запускаємо зміну БК один раз при старті, щоб поля заповнилися
         on_ammo_change(None)
-        
-    except Exception as fatal_e: 
+
+    except Exception as fatal_e:
         page.add(ft.Text(f"Fatal: {fatal_e}", color="red"))
 
 ft.app(target=main)
