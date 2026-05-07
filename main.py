@@ -35,12 +35,11 @@ def save_data(file_path, data):
             json.dump(data, f, ensure_ascii=False, indent=2)
     except: pass
 
-# Завантажуємо бази при старті
 arsenal = load_data(ARSENAL_FILE, BASE_ARSENAL)
 cities_list = load_data(CITIES_FILE, BASE_CITIES)
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.7"
+    page.title = "BALLISTIC PRO v3.8"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
@@ -53,13 +52,13 @@ def main(page: ft.Page):
     try:
         # === ВЕРХНІЙ БЛОК: ВХІДНІ ДАНІ ===
         ent_h = ft.TextField(label="Висота(м)", value="1500", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        ent_v = ft.TextField(label="БПЛА(м/с)", value="25", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
+        ent_v = ft.TextField(label="БПЛА(м/с)", value="28", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
         ent_w = ft.TextField(label="Вітер(м/с)", value="-10", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
 
         # === БЛОК: АРСЕНАЛ ===
-        lbl_m = ft.TextField(label="m (кг)", value="4.61", read_only=True, expand=True, text_size=12)
-        lbl_cx = ft.TextField(label="Cx", value="0.28", read_only=True, expand=True, text_size=12)
-        lbl_s = ft.TextField(label="S (м²)", value="0.00528", read_only=True, expand=True, text_size=12)
+        lbl_m = ft.TextField(label="m (кг)", value="3.1", read_only=True, expand=True, text_size=12)
+        lbl_cx = ft.TextField(label="Cx", value="0.32", read_only=True, expand=True, text_size=12)
+        lbl_s = ft.TextField(label="S (м²)", value="0.0038", read_only=True, expand=True, text_size=12)
 
         def on_ammo_change(e):
             safe_val = ammo_dropdown.value if ammo_dropdown.value in arsenal else list(arsenal.keys())[0]
@@ -79,7 +78,7 @@ def main(page: ft.Page):
         elif hasattr(ammo_dropdown, 'on_select'): ammo_dropdown.on_select = on_ammo_change
 
         # --- ДІАЛОГ АРСЕНАЛУ ---
-        current_editing_bk = [None] # Зберігає назву БК, який ми редагуємо
+        current_editing_bk = [None]
         dlg_name = ft.TextField(label="Назва")
         dlg_m = ft.TextField(label="Маса", keyboard_type=ft.KeyboardType.NUMBER)
         dlg_cx = ft.TextField(label="Cx", keyboard_type=ft.KeyboardType.NUMBER)
@@ -111,7 +110,6 @@ def main(page: ft.Page):
             new_name = dlg_name.value.strip()
             if new_name:
                 old_name = current_editing_bk[0]
-                # Якщо ми перейменували існуючий БК, видаляємо стару назву
                 if old_name and old_name != new_name and old_name in arsenal:
                     del arsenal[old_name]
                 
@@ -157,9 +155,9 @@ def main(page: ft.Page):
             value=cities_list[0] if cities_list else "",
             expand=True
         )
-        ent_temp = ft.TextField(label="t (°C)", value="6.95", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        ent_press = ft.TextField(label="P (гПа)", value="1016", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
-        lbl_rho = ft.Text("ρ: 1.26364", color="#90CAF9", weight="bold")
+        ent_temp = ft.TextField(label="t (°C)", value="22.59", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
+        ent_press = ft.TextField(label="P (гПа)", value="1017", expand=True, keyboard_type=ft.KeyboardType.NUMBER)
+        lbl_rho = ft.Text("ρ: 1.19799", color="#90CAF9", weight="bold")
         lbl_status = ft.Text("", size=11)
 
         # --- ДІАЛОГ МІСТ ---
@@ -248,27 +246,58 @@ def main(page: ft.Page):
                 cx = float(lbl_cx.value.replace(",", "."))
                 s = float(lbl_s.value.replace(",", "."))
                 h = float(ent_h.value.replace(",", "."))
-                v = float(ent_v.value.replace(",", "."))
-                w = float(ent_w.value.replace(",", "."))
+                v_drone = float(ent_v.value.replace(",", "."))
+                w_wind = float(ent_w.value.replace(",", "."))
                 t = float(ent_temp.value.replace(",", "."))
                 p = float(ent_press.value.replace(",", "."))
                 
+                # Густина повітря
                 rho = (p * 100) / (287.05 * (t + 273.15))
                 lbl_rho.value = f"ρ: {round(rho, 5)}"
-                g, k = 9.81, 0.5 * rho * cx * s
+                g = 9.81
+                k = 0.5 * rho * cx * s
                 
-                if k < 0.000001:
-                    t_fall = math.sqrt(2 * h / g)
-                    dist_l = (v + w) * t_fall
-                else:
-                    t_fall = math.sqrt(m/(k*g)) * math.acosh(math.exp(k*h/m))
-                    dist_l = (m/k) * math.log(1 + (k*(v+w)*t_fall)/m)
+                # --- ТОЧНА СИМУЛЯЦІЯ (ЧИСЕЛЬНЕ ІНТЕГРУВАННЯ) ---
+                dt = 0.01  # Крок симуляції 10 мілісекунд
+                x = 0.0    # Горизонтальна відстань
+                y = 0.0    # Вертикальна відстань (падіння)
+                vx = v_drone # Початкова горизонтальна швидкість (відносно землі)
+                vy = 0.0     # Початкова вертикальна швидкість
+                t_fall = 0.0
+                
+                # Симулюємо політ, поки БК не досягне землі
+                while y < h:
+                    # Швидкість вітру відносно БК
+                    # w_wind: + попутний, - зустрічний
+                    v_air_x = vx - w_wind
+                    v_air_y = vy
+                    
+                    # Загальна повітряна швидкість БК
+                    V_total = math.sqrt(v_air_x**2 + v_air_y**2)
+                    
+                    # Прискорення (опір + гравітація)
+                    ax = -(k / m) * V_total * v_air_x
+                    ay = g - (k / m) * V_total * v_air_y
+                    
+                    # Крок у майбутнє
+                    vx += ax * dt
+                    vy += ay * dt
+                    x += vx * dt
+                    y += vy * dt
+                    t_fall += dt
+                    
+                    # Запобіжник
+                    if t_fall > 120:
+                        break
+                
+                dist_l = x
+                angle_deg = math.degrees(math.atan(h / dist_l)) if dist_l > 0 else 90
                 
                 res_time.value = f"{round(t_fall, 3)} с"
                 res_dist.value = f"{round(dist_l, 2)} м"
-                res_angle.value = f"{round(math.degrees(math.atan(h/dist_l)), 2)}°"
+                res_angle.value = f"{round(angle_deg, 2)}°"
                 lbl_status.value = ""
-            except: 
+            except Exception as ex: 
                 lbl_status.value = "Помилка даних!"
                 lbl_status.color = "red"
             page.update()
@@ -276,13 +305,11 @@ def main(page: ft.Page):
         # === КОМПОНУВАННЯ ===
         page.add(
             ft.Column([
-                # Секція Вхідних Даних
                 ft.Text("ВХІДНІ ДАНІ", weight="bold", size=18, color="#90CAF9"),
                 ft.Row([ent_h, ent_v, ent_w]),
                 
                 ft.Divider(height=15, color="transparent"),
                 
-                # Секція Арсеналу
                 ft.Text("АРСЕНАЛ", weight="bold", size=16, color="#90CAF9"),
                 ft.Row([
                     ammo_dropdown, 
@@ -293,7 +320,6 @@ def main(page: ft.Page):
                 
                 ft.Divider(height=15, color="transparent"),
                 
-                # Секція Метео
                 ft.Text("МЕТЕО", weight="bold", size=16, color="#90CAF9"),
                 ft.Row([
                     city_dropdown, 
@@ -306,12 +332,10 @@ def main(page: ft.Page):
                 
                 ft.Divider(height=15, color="transparent"),
                 
-                # Кнопка Розрахувати
                 ft.ElevatedButton("РОЗРАХУВАТИ", on_click=calculate, bgcolor="green", color="white", height=50, width=400),
                 
                 ft.Divider(height=10, color="transparent"),
 
-                # Таблиця результатів
                 ft.Container(
                     padding=10, border=ft.border.all(1, "grey"), border_radius=10,
                     content=ft.Column([
