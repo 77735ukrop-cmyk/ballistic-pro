@@ -8,6 +8,19 @@ APP_DIR = os.path.dirname(__file__)
 ARSENAL_FILE = os.path.join(APP_DIR, "arsenal.json")
 CITIES_FILE = os.path.join(APP_DIR, "cities.json")
 
+# СТАНДАРТНІ БАЗИ (Відновлені повністю!)
+BASE_ARSENAL = {
+    "ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038},
+    "MOA-120": {"m": 1.59, "cx": 0.25, "s": 0.00212},
+    "MOA-400": {"m": 4.61, "cx": 0.28, "s": 0.00528},
+    "MOA-900": {"m": 10.44, "cx": 0.3, "s": 0.01038},
+    "БЦ-2500": {"m": 3.0, "cx": 0.42, "s": 0.00636},
+    "БЦ-3500": {"m": 4.0, "cx": 0.45, "s": 0.00709},
+    "БЦ-4500": {"m": 5.6, "cx": 0.48, "s": 0.00709}
+}
+
+BASE_CITIES = ["Kramatorsk,UA", "Kostiantynivka,UA", "Toretsk,UA", "Horlivka,UA", "Donetsk,UA"]
+
 def load_data(file_path, default_data):
     if os.path.exists(file_path):
         try:
@@ -24,11 +37,11 @@ def save_data(file_path, data):
     except: 
         pass
 
-arsenal = load_data(ARSENAL_FILE, {"ОГБ-1": {"m": 3.1, "cx": 0.32, "s": 0.0038}})
-cities_list = load_data(CITIES_FILE, ["Kramatorsk,UA"])
+arsenal = load_data(ARSENAL_FILE, BASE_ARSENAL)
+cities_list = load_data(CITIES_FILE, BASE_CITIES)
 
 def main(page: ft.Page):
-    page.title = "BALLISTIC PRO v3.9"
+    page.title = "BALLISTIC PRO v3.9.2"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
     page.padding = ft.padding.only(top=50, left=15, right=15, bottom=20)
@@ -74,7 +87,7 @@ def main(page: ft.Page):
                 if r.get("cod") == 200:
                     ent_temp.value = str(r['main']['temp'])
                     ent_press.value = str(r['main']['pressure'])
-                    ent_w_ground.value = str(r['wind']['speed']) # Підтягуємо вітер біля землі
+                    ent_w_ground.value = str(r['wind']['speed'])
                     lbl_status.value = f"OK: {r['name']}"
                     lbl_status.color = "green"
                 else: 
